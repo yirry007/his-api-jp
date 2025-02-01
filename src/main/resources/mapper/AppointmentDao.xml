@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.his.api.db.dao.AppointmentDao">
+    <select id="searchByOrderId" parameterType="int" resultType="HashMap">
+        SELECT id,
+               name,
+               sex,
+               tel,
+               TIMESTAMPDIFF(YEAR,birthday,NOW()) AS age,
+            date,
+            status
+        FROM tb_appointment
+        WHERE order_id = #{orderId}
+        ORDER BY id DESC
+    </select>
+
+    <insert id="insert" parameterType="com.example.his.api.db.pojo.AppointmentEntity">
+        INSERT INTO tb_appointment
+        SET uuid= #{uuid},
+            order_id = #{orderId},
+            date = #{date},
+            name = #{name},
+            sex = #{sex},
+            pid = #{pid},
+            birthday = #{birthday},
+            tel = #{tel},
+            mailing_address = #{mailingAddress},
+            company = #{company},
+            status = 1
+    </insert>
+
+    <select id="searchFrontAppointmentByPage" parameterType="Map" resultType="HashMap">
+        SELECT a.id,
+        o.goods_title AS goodsTitle,
+        a.name,
+        a.date,
+        a.status,
+        r.file_path AS filePath
+        FROM tb_appointment a
+        JOIN tb_order o ON a.order_id = o.id
+        LEFT JOIN tb_checkup_report r ON a.id = r.appointment_id
+        WHERE o.customer_id = #{customerId}
+        <if test="status!=null">
+            AND a.status = #{status}
+        </if>
+        <if test="date!=null">
+            AND a.date = #{date}
+        </if>
+        <if test="keyword!=null">
+            AND (
+            o.goods_title LIKE CONCAT( "%", #{keyword}, "%" ) OR
+            a.`name` = #{keyword} OR
+            a.tel = #{keyword}
+            )
+        </if>
+        ORDER BY a.id DESC
+        LIMIT #{start}, #{length}
+    </select>
+
+    <select id="searchFrontAppointmentCount" parameterType="Map" resultType="long">
+        SELECT COUNT(*)
+        FROM tb_appointment a
+        JOIN tb_order o ON a.order_id = o.id
+        WHERE o.customer_id = #{customerId}
+        <if test="status!=null">
+            AND a.status = #{status}
+        </if>
+        <if test="date!=null">
+            AND a.date = #{date}
+        </if>
+        <if test="keyword!=null">
+            AND (
+            o.goods_title LIKE CONCAT( "%", #{keyword}, "%" ) OR
+            a.`name` = #{keyword} OR
+            a.tel = #{keyword}
+            )
+        </if>
+    </select>
+
+    <select id="searchByPage" parameterType="Map" resultType="HashMap">
+        SELECT a.id,
+        a.name,
+        a.sex,
+        CONCAT(SUBSTRING(a.tel,1,3),"****",SUBSTRING(a.tel,8,4)) AS tel,
+        CONCAT(SUBSTRING(a.pid,1,3),"***********",SUBSTRING(a.pid,15,4)) AS pid,
+        TIMESTAMPDIFF(YEAR,a.birthday,NOW()) AS age,
+        a.company,
+        a.status,
+        o.goods_title AS title,
+        o.snapshot_id AS snapshotId
+        FROM tb_appointment a
+        JOIN tb_order o ON a.order_id = o.id
+        <where>
+            <if test="date!=null">
+                AND a.date = #{date}
+            </if>
+            <if test="name!=null">
+                AND a.name LIKE CONCAT("%",#{name},"%")
+            </if>
+            <if test="tel!=null">
+                AND a.tel = #{tel}
+            </if>
+            <if test="status!=null">
+                AND a.status = #{status}
+            </if>
+        </where>
+        ORDER BY a.id DESC
+        LIMIT #{start}, #{length}
+    </select>
+
+    <select id="searchCount" parameterType="Map" resultType="long">
+        SELECT COUNT(*)
+        FROM tb_appointment
+        <where>
+            <if test="date!=null">
+                AND date = #{date}
+            </if>
+            <if test="name!=null">
+                AND name LIKE CONCAT("%",#{name},"%")
+            </if>
+            <if test="tel!=null">
+                AND tel = #{tel}
+            </if>
+            <if test="status!=null">
+                AND status = #{status}
+            </if>
+        </where>
+    </select>
+
+    <delete id="deleteByIds">
+        DELETE FROM tb_appointment
+        WHERE id IN
+        <foreach collection="array" open="(" separator="," close=")" item="one">
+            #{one}
+        </foreach>
+        AND status = 1
+    </delete>
+
+    <select id="hasAppointInToday" parameterType="Map" resultType="HashMap">
+        SELECT id, status
+        FROM tb_appointment
+        WHERE date = CURRENT_DATE()
+          AND pid = #{pid}
+          AND name = #{name}
+          AND sex = #{sex}
+            LIMIT 1
+    </select>
+
+    <update id="checkin" parameterType="Map">
+        UPDATE tb_appointment
+        SET `status` = 2,
+            checkin_time = NOW()
+        WHERE date = CURRENT_DATE()
+        AND `status` = 1
+        AND pid = #{pid}
+    </update>
+
+    <select id="searchUuidAndSnapshotId" parameterType="Map" resultType="HashMap">
+        SELECT a.uuid,
+               o.snapshot_id AS snapshotId
+        FROM tb_appointment a
+                 JOIN tb_order o ON a.order_id = o.id
+        WHERE a.date = CURRENT_DATE()
+          AND a.pid = #{pid}
+    </select>
+
+    <select id="searchSummaryById" parameterType="int" resultType="HashMap">
+        SELECT a.uuid,
+               a.order_id  AS orderId,
+               o.snapshot_id AS snapshotId,
+               a.name,
+               a.sex,
+               TIMESTAMPDIFF(YEAR,a.birthday, NOW()) AS age,
+               a.pid,
+               a.tel,
+               a.date,
+               a.company
+        FROM tb_appointment a
+                 JOIN tb_order o ON a.order_id = o.id
+        WHERE a.id = #{id}
+    </select>
+
+    <update id="updateStatusByUuid" parameterType="Map">
+        UPDATE tb_appointment
+        SET status = #{status}
+        WHERE uuid = #{uuid}
+          AND status != 3
+    </update>
+
+    <select id="searchByUuid" parameterType="String" resultType="HashMap">
+        SELECT a.order_id AS orderId,
+               a.`name`,
+               a.sex,
+               TIMESTAMPDIFF(YEAR, a.birthday, NOW()) AS age,
+               a.tel,
+               a.uuid,
+               a.date,
+               a.`status`,
+               o.snapshot_id AS snapshotId
+        FROM tb_appointment a
+                 JOIN tb_order o ON a.order_id = o.id
+        WHERE a.uuid = #{uuid}
+    </select>
+
+    <select id="searchDataForReport" parameterType="int" resultType="HashMap">
+        SELECT a.uuid,
+               a.`name`,
+               a.sex,
+               a.tel,
+               a.birthday,
+               TIMESTAMPDIFF(YEAR, a.birthday, NOW()) AS age,
+               IFNULL(a.company,'个人体检') AS company,
+               a.date,
+               o.goods_title AS goods
+        FROM tb_appointment a
+                 JOIN tb_order o ON a.order_id = o.id
+        WHERE a.id = #{id};
+    </select>
+
+    <select id="searchDataForWaybill" parameterType="String" resultType="HashMap">
+        SELECT id,
+               name,
+               tel
+        FROM tb_appointment
+        WHERE uuid = #{uuid}
+    </select>
+
+</mapper>
